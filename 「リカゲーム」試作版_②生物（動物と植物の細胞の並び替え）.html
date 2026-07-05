@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>「リカゲーム」試作版</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: #121212; /* イカゲーム風の漆黒背景 */
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            user-select: none;
+        }
+
+        /* イカゲームのフォント・色（ショッキングピンク）を意識したタイトル */
+        h1 {
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 5px;
+            text-align: center;
+            color: #ff007f; /* 特徴的なピンク */
+            text-shadow: 0 0 10px rgba(255, 0, 127, 0.6);
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            color: #00f0ff; /* トライアングルや案内人をイメージさせる差し色シアン */
+            font-size: 14px;
+            margin-top: 0;
+            margin-bottom: 25px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .container {
+            display: flex;
+            gap: 40px;
+            max-width: 1000px;
+            width: 100%;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* 左側：パーツエリア */
+        .parts-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 50%;
+        }
+
+        .parts-row {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-start;
+            flex-wrap: wrap;
+        }
+
+        .part-card {
+            background: #1e1e1e;
+            border: 2px solid #333;
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: grab;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            transition: transform 0.2s, opacity 0.2s, border-color 0.2s;
+        }
+
+        .part-card:hover {
+            border-color: #ff007f; /* ホバーでピンクに光る */
+        }
+
+        .part-card:active {
+            cursor: grabbing;
+            transform: scale(0.95);
+        }
+
+        /* 2回使い切ったら非表示にするスタイル */
+        .part-card.hidden {
+            opacity: 0;
+            pointer-events: none;
+            visibility: hidden;
+        }
+
+        .part-title {
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #ccc;
+        }
+
+        .svg-icon {
+            width: 120px;
+            height: 80px;
+        }
+
+        /* 右側：ターゲットエリア */
+        .target-section {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            width: 45%;
+        }
+
+        .target-container {
+            position: relative;
+        }
+
+        .target-label {
+            font-weight: bold;
+            font-size: 18px;
+            margin-bottom: 5px;
+            color: #ff007f;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* ○△□の記号をラベルに添えてイカゲーム感を強調 */
+        #plant-label::before { content: "◯"; font-size: 14px; color: #00f0ff; }
+        #animal-label::before { content: "□"; font-size: 14px; color: #00f0ff; }
+
+        .target-box {
+            background: #1a1a1a;
+            border: 2px solid #ff007f; /* ピンクのフレーム */
+            border-radius: 12px;
+            width: 100%;
+            height: 240px;
+            position: relative;
+            box-sizing: border-box;
+            overflow: hidden;
+            cursor: pointer;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+
+        .target-box.drag-over {
+            background: #2a1b25;
+            border-color: #00f0ff; /* ドラッグ中はシアンに光る */
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.4);
+        }
+
+        /* 重ね合わせる細胞イラストのベース（初期は非表示） */
+        .cell-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+
+        /* パーツが配置されたら表示 */
+        .cell-layer.show {
+            opacity: 1;
+        }
+
+        /* ボタンと結果表示エリア */
+        .action-area {
+            margin-top: 35px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 20px;
+        }
+
+        .btn {
+            color: white;
+            border: none;
+            padding: 14px 35px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            transition: background 0.2s, transform 0.1s;
+            letter-spacing: 1px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        /* 答え合わせ＝ゲーム参加 */
+        .btn-submit {
+            background: #ff007f;
+        }
+
+        .btn-submit:hover {
+            background: #e60072;
+        }
+
+        /* リスタ＝脱落・やり直し */
+        .btn-reset {
+            background: #333;
+            border: 1px solid #555;
+        }
+
+        .btn-reset:hover {
+            background: #444;
+        }
+
+        #result-message {
+            font-size: 20px;
+            font-weight: bold;
+            min-height: 30px;
+            text-align: center;
+            text-shadow: 0 0 8px rgba(0,0,0,0.5);
+        }
+        .correct { color: #00ff66; text-shadow: 0 0 10px rgba(0,255,102,0.5); }
+        .incorrect { color: #ff3333; text-shadow: 0 0 10px rgba(255,51,51,0.5); }
+
+        .hint-text {
+            font-size: 11px;
+            color: #888;
+            margin-top: 4px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>「リカゲーム」試作版</h1>
+    <div class="subtitle">制限時間内に細胞を完成させよ。さもなくば脱落（誤答）となる。</div>
+
+    <div class="container">
+        <div class="parts-section">
+            <div class="parts-row">
+                <div class="part-card" draggable="true" id="part-1">
+                    <div class="part-title">① 細胞膜</div>
+                    <svg class="svg-icon" viewBox="0 0 120 80">
+                        <rect x="10" y="10" width="100" height="60" rx="15" fill="none" stroke="#ff007f" stroke-width="4"/>
+                    </svg>
+                </div>
+                <div class="part-card" draggable="true" id="part-2">
+                    <div class="part-title">② 細胞壁</div>
+                    <svg class="svg-icon" viewBox="0 0 120 80">
+                        <rect x="5" y="5" width="110" height="70" rx="15" fill="none" stroke="#00f0ff" stroke-width="5"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="parts-row">
+                <div class="part-card" draggable="true" id="part-3">
+                    <div class="part-title">③ 核</div>
+                    <svg class="svg-icon" viewBox="0 0 120 80">
+                        <circle cx="60" cy="40" r="18" fill="#d8b4fe" stroke="#a855f7" stroke-width="2" stroke-dasharray="1 2"/>
+                    </svg>
+                </div>
+                <div class="part-card" draggable="true" id="part-4">
+                    <div class="part-title">④ 液胞</div>
+                    <svg class="svg-icon" viewBox="0 0 120 80">
+                        <path d="M20 30 Q40 20, 70 25 Q100 30, 90 50 Q60 65, 40 55 Z" fill="#e0f2fe" stroke="#38bdf8" stroke-width="2"/>
+                    </svg>
+                </div>
+                <div class="part-card" draggable="true" id="part-5">
+                    <div class="part-title">⑤ 葉緑体</div>
+                    <svg class="svg-icon" viewBox="0 0 120 80">
+                        <ellipse cx="40" cy="30" rx="8" ry="4" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(15, 40, 30)"/>
+                        <ellipse cx="70" cy="25" rx="8" ry="4" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(-10, 70, 25)"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="target-section">
+            
+            <div class="target-container">
+                <div class="target-label" id="plant-label">植物細胞</div>
+                <div class="target-box" id="plant-box">
+                    <svg class="cell-layer layer-part-2" viewBox="0 0 350 240">
+                        <rect x="15" y="15" width="320" height="210" rx="25" fill="none" stroke="#00f0ff" stroke-width="6"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-1" viewBox="0 0 350 240">
+                        <rect x="25" y="25" width="300" height="190" rx="20" fill="#222" stroke="#ff007f" stroke-width="4"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-4" viewBox="0 0 350 240">
+                        <path d="M40 60 Q100 30, 180 40 Q250 50, 240 100 Q150 120, 80 100 Z" fill="#1e3a8a" opacity="0.6" stroke="#38bdf8" stroke-width="2"/>
+                        <path d="M80 150 Q180 175, 290 150 Q310 190, 240 200 Q140 200, 70 185 Z" fill="#1e3a8a" opacity="0.6" stroke="#38bdf8" stroke-width="2"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-5" viewBox="0 0 350 240">
+                        <ellipse cx="300" cy="65" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(30, 300, 65)"/>
+                        <ellipse cx="285" cy="90" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(-15, 285, 90)"/>
+                        <ellipse cx="55" cy="160" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(45, 55, 160)"/>
+                        <ellipse cx="85" cy="150" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(-10, 85, 150)"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-3" viewBox="0 0 350 240">
+                        <circle cx="210" cy="115" r="26" fill="#d8b4fe" stroke="#a855f7" stroke-width="2" stroke-dasharray="2 3"/>
+                    </svg>
+                </div>
+                <div class="hint-text">※枠内をクリックでパーツ回収</div>
+            </div>
+
+            <div class="target-container">
+                <div class="target-label" id="animal-label">動物細胞</div>
+                <div class="target-box" id="animal-box">
+                    <svg class="cell-layer layer-part-2" viewBox="0 0 350 240">
+                        <rect x="15" y="15" width="320" height="210" rx="25" fill="none" stroke="#00f0ff" stroke-width="6"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-1" viewBox="0 0 350 240">
+                        <rect x="25" y="25" width="300" height="190" rx="20" fill="#222" stroke="#ff007f" stroke-width="4"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-4" viewBox="0 0 350 240">
+                        <path d="M40 60 Q100 30, 180 40 Q250 50, 240 100 Q150 120, 80 100 Z" fill="#1e3a8a" opacity="0.6" stroke="#38bdf8" stroke-width="2"/>
+                        <path d="M80 150 Q180 175, 290 150 Q310 190, 240 200 Q140 200, 70 185 Z" fill="#1e3a8a" opacity="0.6" stroke="#38bdf8" stroke-width="2"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-5" viewBox="0 0 350 240">
+                        <ellipse cx="300" cy="65" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(30, 300, 65)"/>
+                        <ellipse cx="285" cy="90" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(-15, 285, 90)"/>
+                        <ellipse cx="55" cy="160" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(45, 55, 160)"/>
+                        <ellipse cx="85" cy="150" rx="14" ry="7" fill="#86efac" stroke="#16a34a" stroke-width="2" transform="rotate(-10, 85, 150)"/>
+                    </svg>
+                    <svg class="cell-layer layer-part-3" viewBox="0 0 350 240">
+                        <circle cx="210" cy="115" r="26" fill="#d8b4fe" stroke="#a855f7" stroke-width="2" stroke-dasharray="2 3"/>
+                    </svg>
+                </div>
+                <div class="hint-text">※枠内をクリックでパーツ回収</div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="action-area">
+        <div class="button-group">
+            <button class="btn btn-submit" onclick="checkAnswers()">答え合わせ</button>
+            <button class="btn btn-reset" onclick="resetQuiz()">リセット</button>
+        </div>
+        <div id="result-message"></div>
+    </div>
+
+    <script>
+        const GOAL = {
+            'plant-box': ['part-1', 'part-2', 'part-3', 'part-4', 'part-5'],
+            'animal-box': ['part-1', 'part-3']
+        };
+
+        let currentAnswers = {
+            'plant-box': [],
+            'animal-box': []
+        };
+
+        const cards = document.querySelectorAll('.part-card');
+        cards.forEach(card => {
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', e.target.id);
+            });
+        });
+
+        const boxes = document.querySelectorAll('.target-box');
+        boxes.forEach(box => {
+            box.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                box.classList.add('drag-over');
+            });
+
+            box.addEventListener('dragleave', () => {
+                box.classList.remove('drag-over');
+            });
+
+            box.addEventListener('drop', (e) => {
+                e.preventDefault();
+                box.classList.remove('drag-over');
+                
+                const id = e.dataTransfer.getData('text/plain');
+                if (!id) return;
+
+                const boxId = box.id;
+
+                if (!currentAnswers[boxId].includes(id)) {
+                    currentAnswers[boxId].push(id);
+                    
+                    const layer = box.querySelector(`.layer-${id}`);
+                    if (layer) layer.classList.add('show');
+
+                    updateCardVisibility(id);
+                    document.getElementById('result-message').innerText = '';
+                }
+            });
+
+            box.addEventListener('click', (e) => {
+                if (currentAnswers[box.id].length === 0) return;
+
+                const removedId = currentAnswers[box.id].pop();
+                
+                const layer = box.querySelector(`.layer-${removedId}`);
+                if (layer) layer.classList.remove('show');
+
+                updateCardVisibility(removedId);
+                document.getElementById('result-message').innerText = '';
+            });
+        });
+
+        function updateCardVisibility(cardId) {
+            let count = 0;
+            if (currentAnswers['plant-box'].includes(cardId)) count++;
+            if (currentAnswers['animal-box'].includes(cardId)) count++;
+
+            const cardElement = document.getElementById(cardId);
+            if (cardElement) {
+                if (count >= 2) {
+                    cardElement.classList.add('hidden');
+                } else {
+                    cardElement.classList.remove('hidden');
+                }
+            }
+        }
+
+        function checkAnswers() {
+            const resultEl = document.getElementById('result-message');
+            
+            const plantCorrect = isMatch(currentAnswers['plant-box'], GOAL['plant-box']);
+            const animalCorrect = isMatch(currentAnswers['animal-box'], GOAL['animal-box']);
+
+            if (plantCorrect && animalCorrect) {
+                resultEl.className = 'correct';
+                resultEl.innerText = '🟢 生存：正解です！次のステージへ進めます。';
+            } else {
+                resultEl.className = 'incorrect';
+                resultEl.innerText = '🔴 脱落：間違っているか、パーツが足りません。';
+            }
+        }
+
+        function isMatch(arr1, arr2) {
+            if (arr1.length !== arr2.length) return false;
+            return [...arr1].sort().every((val, index) => val === [...arr2].sort()[index]);
+        }
+
+        function resetQuiz() {
+            currentAnswers['plant-box'] = [];
+            currentAnswers['animal-box'] = [];
+
+            const layers = document.querySelectorAll('.cell-layer');
+            layers.forEach(layer => layer.classList.remove('show'));
+
+            cards.forEach(card => card.classList.remove('hidden'));
+
+            document.getElementById('result-message').innerText = '';
+        }
+    </script>
+</body>
+</html>
